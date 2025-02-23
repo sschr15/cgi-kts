@@ -1,0 +1,43 @@
+[versions]
+kotlin = "2.1.10"
+kotlinx-coroutines = "1.10.1"
+kotlinx-datetime = "0.6.2"
+kotlinx-html = "0.12.0"
+annotations = "26.0.2"
+
+[libraries]
+kotlin-scripting-common = { module = "org.jetbrains.kotlin:kotlin-scripting-common" }
+kotlin-scripting-jvm = { module = "org.jetbrains.kotlin:kotlin-scripting-jvm" }
+kotlin-scripting-jvm-host = { module = "org.jetbrains.kotlin:kotlin-scripting-jvm-host" }
+kotlin-scripting-dependencies = { module = "org.jetbrains.kotlin:kotlin-scripting-dependencies" }
+kotlin-scripting-dependencies-maven = { module = "org.jetbrains.kotlin:kotlin-scripting-dependencies-maven" }
+kotlin-scripting-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+kotlinx-html = { module = "org.jetbrains.kotlinx:kotlinx-html", version.ref = "kotlinx-html" }
+annotations = { module = "org.jetbrains:annotations", version.ref = "annotations" }
+
+[bundles]
+scripting-client = [
+    "kotlin-scripting-common",
+    "kotlin-scripting-jvm",
+    "kotlin-scripting-dependencies",
+    "kotlin-scripting-dependencies-maven",
+    "kotlinx-coroutines-core",
+    "kotlinx-datetime",
+    "kotlinx-html",
+    "annotations"
+]
+
+scripting-host = [
+    "kotlin-scripting-common",
+    "kotlin-scripting-jvm",
+    "kotlin-scripting-jvm-host",
+    "kotlin-scripting-compiler-embeddable",
+    "kotlinx-coroutines-core",
+    "annotations"
+]
+
+[plugins]
+kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
