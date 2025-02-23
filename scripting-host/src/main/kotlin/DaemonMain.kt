@@ -44,7 +44,7 @@ object DaemonMain {
                     } else {
                         // Create a 16-byte name from the first 9 characters and the last 6 characters
                         // (and a one byte to "guarantee" distinctness)
-                        val firstPart = baseFileName.encodeToByteArray().take(9).toByteArray().toString()
+                        val firstPart = baseFileName.encodeToByteArray().take(9).toByteArray().decodeToString()
                         val nameHash = baseFileName.hashCode()
                         val hashString = nameHash.toString(36)
                             .padStart(6, '0') // make at least 6 characters long
