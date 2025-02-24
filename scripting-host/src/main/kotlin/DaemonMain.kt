@@ -1,5 +1,6 @@
 package com.sschr15.scripting
 
+import com.dynatrace.hash4j.file.FileHashing
 import com.sschr15.scripting.api.HttpStatusCode
 import kotlinx.coroutines.*
 import java.net.StandardProtocolFamily
@@ -15,7 +16,7 @@ import java.util.concurrent.Executors
 import kotlin.io.path.*
 import kotlin.time.Duration.Companion.seconds
 
-@OptIn(ExperimentalPathApi::class)
+@OptIn(ExperimentalPathApi::class, ExperimentalStdlibApi::class)
 object DaemonMain {
     private val scriptCache = ScriptCache()
 
@@ -25,6 +26,7 @@ object DaemonMain {
 
         val checker = launch {
             val checkPath = Path(args.getOrNull(1) ?: "./kt-scripts")
+            val hashMap = mutableMapOf<Path, String>()
 
             while (true) {
                 val needsCompilation = mutableListOf<Path>()
@@ -52,8 +54,13 @@ object DaemonMain {
                         "$firstPart\u0001$hashString"
                     }
 
-                    if (fileMap[shortName] != it) {
+                    val hash = withContext(Dispatchers.IO) {
+                        FileHashing.imohash1_0_2().hashFileTo128Bits(it).toByteArray().toHexString()
+                    }
+
+                    if (fileMap[shortName] != it || hash != hashMap[it]) {
                         fileMap[shortName] = it
+                        hashMap[it] = hash
                         needsCompilation.add(it)
                     }
                 }
