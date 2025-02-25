@@ -7,6 +7,7 @@ import kotlin.script.experimental.dependencies.maven.MavenDependenciesResolver
 import kotlin.script.experimental.jvm.JvmDependency
 import kotlin.script.experimental.jvm.dependenciesFromCurrentContext
 import kotlin.script.experimental.jvm.jvm
+import kotlin.script.experimental.jvm.jvmTarget
 
 internal object CgiScriptCompilationConfiguration : ScriptCompilationConfiguration({
     defaultImports("com.sschr15.scripting.api.*")
@@ -14,6 +15,8 @@ internal object CgiScriptCompilationConfiguration : ScriptCompilationConfigurati
     defaultImports(Repository::class, DependsOn::class)
 
     jvm {
+        // Use detected version if possible, or Java 21 (the version used for this project) if unknown
+        jvmTarget(System.getProperty("java.specification.version") ?: "21")
         dependenciesFromCurrentContext(wholeClasspath = true)
     }
 
