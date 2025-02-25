@@ -105,3 +105,14 @@ public fun ResponseBuilder.headers(block: HeaderBuilder.() -> Unit) {
     val builder = HeaderBuilder(this)
     block(builder)
 }
+
+@ResponseBuilderDsl
+public fun ResponseBuilder.text(text: String) {
+    this.text.append(text)
+    headers.add("Content-Type" to "text/plain")
+    headers.add("Content-Length" to this.text.length.toString())
+}
+
+@ResponseBuilderDsl
+public inline fun ResponseBuilder.text(block: StringBuilder.() -> Unit) =
+    text(buildString(block))
