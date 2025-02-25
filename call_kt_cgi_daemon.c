@@ -141,10 +141,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int pid = getpid();
-    DEBUG("Sending pid %d\n", pid);
-    write(server_fd, &pid, sizeof(int));
-
     char *short_name = generate_short_name(filename);
     DEBUG("Sending short name %s\n", short_name);
     write(server_fd, short_name, 17);

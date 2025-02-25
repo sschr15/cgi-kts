@@ -5,6 +5,8 @@ import com.sschr15.scripting.api.HttpStatusCode.ServerError.Companion.InternalSe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.script.experimental.api.*
@@ -15,14 +17,16 @@ import kotlin.script.experimental.jvmhost.createJvmCompilationConfigurationFromT
 import kotlin.script.experimental.jvmhost.createJvmEvaluationConfigurationFromTemplate
 
 class ScriptCache {
-    private val cache = mutableMapOf<Path, CompiledScript>() //TODO
+    private val cacheLocation = System.getProperty("script.cache")?.let(::Path)
+    private val cache = SerializableBackedMutableMap<String, CompiledScript>(cacheLocation)
+
     private val compiler = JvmScriptCompiler()
 
     fun uncache(path: Path) {
-        cache.remove(path)
+        cache.remove(path.absolutePathString())
     }
 
-    operator fun contains(path: Path): Boolean = path in cache
+    operator fun contains(path: Path): Boolean = path.absolutePathString() in cache
 
     suspend fun compile(path: Path): Boolean {
         val config = createJvmCompilationConfigurationFromTemplate<CgiScript>()
@@ -35,7 +39,13 @@ class ScriptCache {
         scriptResult.reports.forEach { println(it.render()) }
 
         if (scriptResult is ResultWithDiagnostics.Success) {
-            cache[path] = scriptResult.value
+            cache[path.absolutePathString()] = scriptResult.value
+
+            if (cacheLocation != null) withContext(Dispatchers.IO) {
+                cache.save(cacheLocation)
+                println("Compiled $path and cached to $cacheLocation")
+            }
+
             return true
         } else {
             return false
@@ -43,7 +53,7 @@ class ScriptCache {
     }
 
     suspend fun evaluate(path: Path, envRequest: (String) -> String?): String {
-        val script = cache[path] ?: return buildString {
+        val script = cache[path.absolutePathString()] ?: return buildString {
             append("HTTP/1.1 ")
             append(InternalServerError)
             append("\r\n\r\n")
@@ -55,6 +65,14 @@ class ScriptCache {
 
         val evalConfig = createJvmEvaluationConfigurationFromTemplate<CgiScript> { 
             constructorArgs(responseInfo)
+            scriptExecutionWrapper {
+                try {
+                    it()
+                } catch (e: Throwable) {
+                    if (e !is CgiScriptStoppedException) throw e
+                    else return@scriptExecutionWrapper
+                }
+            }
         }
 
         val result = BasicJvmScriptEvaluator()(script, evalConfig)

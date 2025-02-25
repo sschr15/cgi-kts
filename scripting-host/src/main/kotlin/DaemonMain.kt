@@ -140,13 +140,8 @@ object DaemonMain {
                         client.write(arrayOf(one, ByteBuffer.wrap(messageBytes), zero))
                     }
 
-                    val pidBytes = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN)
                     val scriptBytes = ByteBuffer.allocate(17)
-                    client.read(arrayOf(pidBytes, scriptBytes))
-                    pidBytes.rewind()
-
-                    val pid = pidBytes.int
-                    println("Communicating with PID $pid")
+                    client.read(scriptBytes)
 
                     val scriptName = scriptBytes.array()
                         .dropLastWhile { it.toInt() == 0 }

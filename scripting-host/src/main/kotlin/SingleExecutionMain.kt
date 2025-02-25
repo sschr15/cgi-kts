@@ -4,8 +4,10 @@ import com.sschr15.scripting.api.CgiScript
 import kotlin.io.path.Path
 import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.readText
+import kotlin.script.experimental.api.ScriptDiagnostic
 import kotlin.script.experimental.api.constructorArgs
 import kotlin.script.experimental.api.onFailure
+import kotlin.script.experimental.api.scriptExecutionWrapper
 import kotlin.script.experimental.host.toScriptSource
 import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 import kotlin.script.experimental.jvmhost.createJvmCompilationConfigurationFromTemplate
@@ -16,10 +18,19 @@ object SingleExecutionMain {
     @JvmStatic
     fun main(args: Array<String>) {
         val responseInfo = CgiResponseInfo(System::getenv)
+        responseInfo.result = "<no response received>"
 
         val compilationConfig = createJvmCompilationConfigurationFromTemplate<CgiScript>()
         val evaluationConfig = createJvmEvaluationConfigurationFromTemplate<CgiScript> { 
             constructorArgs(responseInfo)
+            scriptExecutionWrapper { 
+                try {
+                    it()
+                } catch (e: Throwable) {
+                    if (e !is CgiScriptStoppedException) throw e
+                    else return@scriptExecutionWrapper
+                }
+            }
         }
 
         val scriptPath = Path(args[0])
@@ -27,12 +38,16 @@ object SingleExecutionMain {
 
         BasicJvmScriptingHost().eval(source, compilationConfig, evaluationConfig)
             .onFailure { diagnostics ->
-                diagnostics.reports.forEach {
-                    System.err.println(it.render())
+                diagnostics.reports.filter { it.severity > ScriptDiagnostic.Severity.DEBUG }.forEach {
+                    System.err.println(it.render(withStackTrace = true))
                 }
                 exitProcess(1)
             }
 
-        println(responseInfo.result)
+        try {
+            println(responseInfo.result)
+        } catch (_: UninitializedPropertyAccessException) {
+            println("The script at $scriptPath failed to respond.")
+        }
     }
 }

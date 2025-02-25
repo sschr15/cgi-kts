@@ -6,6 +6,7 @@ import kotlinx.datetime.format.DateTimeComponents
 import kotlinx.datetime.format.DayOfWeekNames
 import kotlinx.datetime.format.MonthNames
 import kotlinx.html.HTML
+import kotlinx.html.HtmlTagMarker
 import kotlinx.html.html
 import kotlinx.html.stream.createHTML
 import kotlin.time.Duration
@@ -92,6 +93,7 @@ public fun CgiScript.respond(code: HttpStatusCode, block: ResponseBuilder.() -> 
 }
 
 @ResponseBuilderDsl
+@HtmlTagMarker // What's better than one DSL marker? Two DSL markers!
 public fun ResponseBuilder.html(prettyPrint: Boolean = true, xhtmlCompatible: Boolean = false, builder: HTML.() -> Unit) {
     headers.add("Content-Type" to "text/html")
     text.append(createHTML(prettyPrint, xhtmlCompatible).html(block = builder))
