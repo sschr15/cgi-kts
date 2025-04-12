@@ -5,6 +5,10 @@ kotlinx-datetime = "0.6.2"
 kotlinx-html = "0.12.0"
 annotations = "26.0.2"
 hash4j = "0.20.0"
+kotlin-logging = "7.0.4"
+slf4j = "2.0.17"
+logback = "1.5.17"
+jansi = "2.4.1"
 
 [libraries]
 kotlin-scripting-common = { module = "org.jetbrains.kotlin:kotlin-scripting-common" }
@@ -19,6 +23,10 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 kotlinx-html = { module = "org.jetbrains.kotlinx:kotlinx-html", version.ref = "kotlinx-html" }
 annotations = { module = "org.jetbrains:annotations", version.ref = "annotations" }
 hash4j = { module = "com.dynatrace.hash4j:hash4j", version.ref = "hash4j" }
+kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
+slf4j = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+jansi = { module = "org.fusesource.jansi:jansi", version.ref = "jansi" }
 
 [bundles]
 scripting-client = [
@@ -29,7 +37,9 @@ scripting-client = [
     "kotlinx-coroutines-core",
     "kotlinx-datetime",
     "kotlinx-html",
-    "annotations"
+    "annotations",
+    "slf4j",
+    "kotlin-logging",
 ]
 
 scripting-host = [
@@ -39,7 +49,11 @@ scripting-host = [
     "kotlin-scripting-compiler-embeddable",
     "kotlinx-coroutines-core",
     "annotations",
-    "hash4j"
+    "hash4j",
+    "slf4j",
+    "logback",
+    "kotlin-logging",
+    "jansi",
 ]
 
 [plugins]

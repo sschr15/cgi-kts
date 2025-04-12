@@ -19,10 +19,13 @@ application {
 }
 
 tasks.jar {
-    manifest { 
+    manifest {
         attributes["Main-Class"] = application.mainClass
     }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }) {
+        exclude("module-info.class")
+    }
+    entryCompression = ZipEntryCompression.STORED
 }

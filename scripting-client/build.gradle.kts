@@ -10,6 +10,12 @@ java {
 
 kotlin {
     explicitApi()
+
+    compilerOptions { 
+        optIn.addAll(
+            "kotlin.ExperimentalStdlibApi",
+        )
+    }
 }
 
 dependencies {

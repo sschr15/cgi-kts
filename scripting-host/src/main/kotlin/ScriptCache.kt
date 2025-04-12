@@ -2,6 +2,7 @@ package com.sschr15.scripting
 
 import com.sschr15.scripting.api.CgiScript
 import com.sschr15.scripting.api.HttpStatusCode.ServerError.Companion.InternalServerError
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
@@ -36,14 +37,14 @@ class ScriptCache {
         }
 
         val scriptResult = compiler(scriptSource, config)
-        scriptResult.reports.forEach { println(it.render()) }
+        scriptResult.reports.forEach { it.logTo(logger) }
 
         if (scriptResult is ResultWithDiagnostics.Success) {
             cache[path.absolutePathString()] = scriptResult.value
 
             if (cacheLocation != null) withContext(Dispatchers.IO) {
                 cache.save(cacheLocation)
-                println("Compiled $path and cached to $cacheLocation")
+                logger.info { "Compiled $path and cached to $cacheLocation" }
             }
 
             return true
@@ -77,12 +78,14 @@ class ScriptCache {
 
         val result = BasicJvmScriptEvaluator()(script, evalConfig)
 
-        result.onFailure { 
+        result.onFailure { result ->
+            result.reports.forEach { it.logTo(logger) }
+
             return buildString {
                 append("HTTP/1.1 ")
                 append(InternalServerError)
                 append("\r\n\r\n")
-                append(it.reports.joinToString("\n", transform = ScriptDiagnostic::render))
+                append(result.reports.joinToString("\n", transform = ScriptDiagnostic::render))
                 append("\r\n\r\n")
             }
         }
@@ -98,5 +101,9 @@ class ScriptCache {
                 append("\r\n\r\n")
             }
         }
+    }
+
+    companion object {
+        private val logger = KotlinLogging.logger {}
     }
 }

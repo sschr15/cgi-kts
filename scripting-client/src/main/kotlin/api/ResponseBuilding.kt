@@ -95,9 +95,9 @@ public fun CgiScript.respond(code: HttpStatusCode, block: ResponseBuilder.() -> 
 @ResponseBuilderDsl
 @HtmlTagMarker // What's better than one DSL marker? Two DSL markers!
 public fun ResponseBuilder.html(prettyPrint: Boolean = true, xhtmlCompatible: Boolean = false, builder: HTML.() -> Unit) {
-    headers.add("Content-Type" to "text/html")
+    headers.add("Content-Type" to "text/html; charset=utf-8")
     text.append(createHTML(prettyPrint, xhtmlCompatible).html(block = builder))
-    headers.add("Content-Length" to text.length.toString())
+    headers.add("Content-Length" to text.toString().encodeToByteArray().size.toString())
 }
 
 @ResponseBuilderDsl

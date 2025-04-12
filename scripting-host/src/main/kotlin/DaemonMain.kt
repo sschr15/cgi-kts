@@ -2,6 +2,7 @@ package com.sschr15.scripting
 
 import com.dynatrace.hash4j.file.FileHashing
 import com.sschr15.scripting.api.HttpStatusCode
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
@@ -18,6 +19,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalPathApi::class, ExperimentalStdlibApi::class)
 object DaemonMain {
+    private val logger = KotlinLogging.logger {}
     private val scriptCache = ScriptCache()
 
     @JvmStatic
@@ -29,7 +31,7 @@ object DaemonMain {
             val hashMap = mutableMapOf<Path, String>()
 
             while (true) {
-                val needsCompilation = mutableListOf<Path>()
+                val needsCompilation = mutableListOf<Pair<Path, String>>()
                 val needsRemoval = mutableListOf<Path>()
 
                 for ((key, value) in fileMap) {
@@ -60,21 +62,22 @@ object DaemonMain {
 
                     if (fileMap[shortName] != it || hash != hashMap[it]) {
                         fileMap[shortName] = it
-                        hashMap[it] = hash
-                        needsCompilation.add(it)
+                        needsCompilation.add(it to hash)
                     }
                 }
 
-                for (path in needsCompilation) {
+                for ((path, hash) in needsCompilation) {
                     launch {
-                        println("Found path: $path")
-                        scriptCache.compile(path)
+                        logger.info { "Found path: $path" }
+                        if (scriptCache.compile(path)) {
+                            hashMap[path] = hash
+                        }
                     }
                 }
 
                 for (path in needsRemoval) {
                     launch {
-                        println("Nonexistent path: $path")
+                        logger.info { "Nonexistent path: $path" }
                         scriptCache.uncache(path)
                     }
                 }
@@ -128,7 +131,7 @@ object DaemonMain {
         val runner = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         withContext(runner) {
             while (true) {
-                println("Waiting for connection...")
+                logger.info { "Waiting for connection..." }
                 channel.accept().use { client ->
                     val one = ByteBuffer.wrap(byteArrayOf(1))
                     val zero = ByteBuffer.wrap(byteArrayOf(0))
@@ -149,26 +152,28 @@ object DaemonMain {
                         .decodeToString()
 
                     val scriptPath = fileMap[scriptName] ?: run {
-                        println("No such file: $scriptName")
+                        logger.info { "No such file: $scriptName" }
                         respond("HTTP/1.1 ${HttpStatusCode.ClientError.NotFound}\r\n\r\n")
                         return@use
                     }
 
                     if (scriptPath !in scriptCache) {
                         // There was an error compiling, not the end user's result
-                        println("Compilation failure: $scriptPath")
-                        respond("""
+                        logger.info { "Compilation failure: $scriptPath" }
+                        respond(
+                            """
                             |HTTP/1.1 ${HttpStatusCode.ServerError.InternalServerError}
                             |
                             |This script failed to compile.
-                        """.trimMargin().replace("\n", "\r\n"))
+                        """.trimMargin().replace("\n", "\r\n")
+                        )
                         return@use
                     }
 
                     val amountToReadBuffer = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN)
 
                     val result = scriptCache.evaluate(scriptPath) { env ->
-                        println("Requesting $env")
+                        logger.info { "Requesting $env" }
 
                         amountToReadBuffer.rewind()
 
@@ -189,7 +194,7 @@ object DaemonMain {
                             .decodeToString()
                     }
 
-                    println("Responding (${result.length} characters)")
+                    logger.info { "Responding (${result.length} characters)" }
                     respond(result)
                 }
             }
