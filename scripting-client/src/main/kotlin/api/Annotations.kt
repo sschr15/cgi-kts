@@ -10,6 +10,7 @@ public annotation class PossiblyUnsafeBehavior(
 )
 
 @Target(AnnotationTarget.FILE)
+@Repeatable
 public annotation class DependsOnMavenCentral(
     public val coordinates: String = "",
     public val group: String = "",
@@ -21,11 +22,13 @@ public annotation class DependsOnMavenCentral(
 )
 
 @Target(AnnotationTarget.FILE)
+@Repeatable
 public annotation class DependsOnLocal(
     public val path: String,
 )
 
 @Target(AnnotationTarget.FILE)
+@Repeatable
 public annotation class DependsOnUrl(
     public val url: String,
 )
