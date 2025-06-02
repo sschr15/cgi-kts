@@ -1,6 +1,5 @@
 package com.sschr15.scripting
 
-import com.dynatrace.hash4j.file.FileHashing
 import com.sschr15.scripting.api.HttpStatusCode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
@@ -11,6 +10,7 @@ import java.nio.ByteOrder
 import java.nio.channels.ServerSocketChannel
 import java.nio.file.FileSystems
 import java.nio.file.Path
+import java.nio.file.StandardWatchEventKinds
 import java.nio.file.attribute.UserPrincipalNotFoundException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -28,56 +28,43 @@ object DaemonMain {
 
         val checker = launch {
             val checkPath = Path(args.getOrNull(1) ?: "./kt-scripts")
-            val hashMap = mutableMapOf<Path, String>()
+            val compileWatchKey = checkPath.register(
+                FileSystems.getDefault().newWatchService(),
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_MODIFY,
+            )
+            val removeWatchKey = checkPath.register(
+                FileSystems.getDefault().newWatchService(),
+                StandardWatchEventKinds.ENTRY_DELETE,
+            )
 
             while (true) {
-                val needsCompilation = mutableListOf<Pair<Path, String>>()
-                val needsRemoval = mutableListOf<Path>()
+                for (event in compileWatchKey.pollEvents()) {
+                    val kind = event.kind()
+                    if (kind == StandardWatchEventKinds.OVERFLOW) continue
 
-                for ((key, value) in fileMap) {
-                    if (!value.exists()) {
-                        fileMap.remove(key)
-                        needsRemoval.add(value)
-                    }
-                }
+                    val path = checkPath.resolve(event.context() as Path)
+                    if (path.extension != "cgi.kts") continue
 
-                checkPath.walk().forEach {
-                    val baseFileName = it.name.removeSuffix(".cgi.kts")
-                    val shortName = if (baseFileName.length < 16) {
-                        baseFileName
-                    } else {
-                        // Create a 16-byte name from the first 9 characters and the last 6 characters
-                        // (and a one byte to "guarantee" distinctness)
-                        val firstPart = baseFileName.encodeToByteArray().take(9).toByteArray().decodeToString()
-                        val nameHash = baseFileName.hashCode()
-                        val hashString = nameHash.toString(36)
-                            .padStart(6, '0') // make at least 6 characters long
-                            .takeLast(6) // make at most 6 characters long
-                        "$firstPart\u0001$hashString"
-                    }
+                    logger.info { "Detected change in $path" }
 
-                    val hash = withContext(Dispatchers.IO) {
-                        FileHashing.imohash1_0_2().hashFileTo128Bits(it).toByteArray().toHexString()
-                    }
-
-                    if (fileMap[shortName] != it || hash != hashMap[it]) {
-                        fileMap[shortName] = it
-                        needsCompilation.add(it to hash)
-                    }
-                }
-
-                for ((path, hash) in needsCompilation) {
+                    fileMap[path.generateShortName()] = path
                     launch {
-                        logger.info { "Found path: $path" }
-                        if (scriptCache.compile(path)) {
-                            hashMap[path] = hash
-                        }
+                        scriptCache.compile(path)
                     }
                 }
 
-                for (path in needsRemoval) {
+                for (event in removeWatchKey.pollEvents()) {
+                    val kind = event.kind()
+                    if (kind == StandardWatchEventKinds.OVERFLOW) continue
+
+                    val path = checkPath.resolve(event.context() as Path)
+                    if (path.extension != "cgi.kts") continue
+
+                    logger.info { "Detected removal of $path" }
+
+                    fileMap.remove(path.generateShortName())
                     launch {
-                        logger.info { "Nonexistent path: $path" }
                         scriptCache.uncache(path)
                     }
                 }
@@ -135,13 +122,17 @@ object DaemonMain {
                 channel.accept().use { client ->
                     val one = ByteBuffer.wrap(byteArrayOf(1))
                     val zero = ByteBuffer.wrap(byteArrayOf(0))
+                    val lengthBuf = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN)
 
-                    fun respond(message: String) {
-                        val messageBytes = message.encodeToByteArray()
+                    fun respond(message: ByteArray) {
                         one.rewind()
                         zero.rewind()
-                        client.write(arrayOf(one, ByteBuffer.wrap(messageBytes), zero))
+                        val length = message.size
+                        lengthBuf.rewind().putInt(length).rewind()
+                        client.write(arrayOf(one, lengthBuf, ByteBuffer.wrap(message), zero))
                     }
+
+                    fun respond(message: String) = respond(message.encodeToByteArray())
 
                     val scriptBytes = ByteBuffer.allocate(17)
                     client.read(scriptBytes)
@@ -194,10 +185,27 @@ object DaemonMain {
                             .decodeToString()
                     }
 
-                    logger.info { "Responding (${result.length} characters)" }
+                    logger.info { "Responding (${result.size} bytes)" }
                     respond(result)
                 }
             }
         }
     }
+}
+
+private fun Path.generateShortName(): String {
+    val baseFileName = name.removeSuffix(".cgi.kts")
+    val shortName = if (baseFileName.length < 16) {
+        baseFileName
+    } else {
+        // Create a 16-byte name from the first 9 characters and the last 6 characters
+        // (and a one byte to "guarantee" distinctness)
+        val firstPart = baseFileName.encodeToByteArray().take(9).toByteArray().decodeToString()
+        val nameHash = baseFileName.hashCode()
+        val hashString = nameHash.toString(36)
+            .padStart(6, '0') // make at least 6 characters long
+            .takeLast(6) // make at most 6 characters long
+        "$firstPart\u0001$hashString"
+    }
+    return shortName
 }

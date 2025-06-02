@@ -41,7 +41,7 @@ object SingleExecutionMain {
 
     suspend fun runScript(pathName: String) {
         val responseInfo = CgiResponseInfo(System::getenv)
-        responseInfo.result = "<no response received>"
+        responseInfo.result = "<no response received>".encodeToByteArray()
 
         val compilationConfig = createJvmCompilationConfigurationFromTemplate<CgiScript>()
         val evaluationConfig = createJvmEvaluationConfigurationFromTemplate<CgiScript> { 
@@ -84,7 +84,7 @@ object SingleExecutionMain {
             }
 
         try {
-            logger.info { responseInfo.result }
+            logger.info { responseInfo.result.decodeToString() }
         } catch (_: UninitializedPropertyAccessException) {
             logger.info { "The script at $scriptPath failed to respond." }
         }

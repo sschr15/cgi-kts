@@ -75,29 +75,48 @@ public class HeaderBuilder internal constructor(private val builder: ResponseBui
 
 public class ResponseBuilder {
     internal val headers = mutableSetOf<Pair<String, String>>()
-    internal val text = StringBuilder()
+    internal var bytes = ByteArray(0)
 }
 
 @ResponseBuilderDsl
 public fun CgiScript.respond(code: HttpStatusCode, block: ResponseBuilder.() -> Unit) {
     val builder = ResponseBuilder()
     block(builder)
-    info.result = buildString {
+//    info.result = buildString {
+//        appendLine("HTTP/1.1 ${code.number} ${code.message}")
+//        builder.headers.forEach { (key, value) ->
+//            appendLine("$key: $value")
+//        }
+//        appendLine()
+//        append(builder.text)
+//    }
+
+    val httpHeader = buildString {
         appendLine("HTTP/1.1 ${code.number} ${code.message}")
+        var contentLength = false
         builder.headers.forEach { (key, value) ->
             appendLine("$key: $value")
+            if (key.equals("Content-Length", ignoreCase = true)) {
+                contentLength = true
+            }
         }
+
+        if (!contentLength) {
+            appendLine("Content-Length: ${builder.bytes.size}")
+        }
+
         appendLine()
-        append(builder.text)
     }
+
+    info.result = httpHeader.encodeToByteArray() + builder.bytes
 }
 
 @ResponseBuilderDsl
 @HtmlTagMarker // What's better than one DSL marker? Two DSL markers!
 public fun ResponseBuilder.html(prettyPrint: Boolean = true, xhtmlCompatible: Boolean = false, builder: HTML.() -> Unit) {
+    if (bytes.isNotEmpty()) throw IllegalStateException("Cannot call html() already writing a response body.")
     headers.add("Content-Type" to "text/html; charset=utf-8")
-    text.append(createHTML(prettyPrint, xhtmlCompatible).html(block = builder))
-    headers.add("Content-Length" to text.toString().encodeToByteArray().size.toString())
+    bytes = createHTML(prettyPrint, xhtmlCompatible).html(block = builder).encodeToByteArray()
 }
 
 @ResponseBuilderDsl
@@ -108,9 +127,9 @@ public fun ResponseBuilder.headers(block: HeaderBuilder.() -> Unit) {
 
 @ResponseBuilderDsl
 public fun ResponseBuilder.text(text: String) {
-    this.text.append(text)
+    if (bytes.isNotEmpty()) throw IllegalStateException("Cannot call text() already writing a response body.")
     headers.add("Content-Type" to "text/plain")
-    headers.add("Content-Length" to this.text.length.toString())
+    bytes = text.encodeToByteArray()
 }
 
 @ResponseBuilderDsl

@@ -29,7 +29,7 @@ class ScriptCache {
 
     operator fun contains(path: Path): Boolean = path.absolutePathString() in cache
 
-    suspend fun compile(path: Path): Boolean {
+    suspend fun compile(path: Path): List<ScriptDiagnostic> {
         val config = createJvmCompilationConfigurationFromTemplate<CgiScript>()
 
         val scriptSource = withContext(Dispatchers.IO) {
@@ -46,21 +46,22 @@ class ScriptCache {
                 cache.save(cacheLocation)
                 logger.info { "Compiled $path and cached to $cacheLocation" }
             }
-
-            return true
-        } else {
-            return false
         }
+
+        return scriptResult.reports
     }
 
-    suspend fun evaluate(path: Path, envRequest: (String) -> String?): String {
-        val script = cache[path.absolutePathString()] ?: return buildString {
-            append("HTTP/1.1 ")
-            append(InternalServerError)
-            append("\r\n\r\n")
-            append("This script failed to compile.")
-            append("\r\n\r\n")
-        }
+    private fun serverErrorResponse(message: String) = buildString {
+        append("HTTP/1.1 ")
+        append(InternalServerError)
+        append("\r\n\r\n")
+        append(message)
+        append("\r\n\r\n")
+    }.toByteArray()
+
+    suspend fun evaluate(path: Path, envRequest: (String) -> String?): ByteArray {
+        val script = cache[path.absolutePathString()]
+            ?: return serverErrorResponse("The requested script failed to compile or was not found in the cache.")
 
         val responseInfo = CgiResponseInfo(envRequest)
 
@@ -81,25 +82,15 @@ class ScriptCache {
         result.onFailure { result ->
             result.reports.forEach { it.logTo(logger) }
 
-            return buildString {
-                append("HTTP/1.1 ")
-                append(InternalServerError)
-                append("\r\n\r\n")
-                append(result.reports.joinToString("\n", transform = ScriptDiagnostic::render))
-                append("\r\n\r\n")
-            }
+            return serverErrorResponse(
+                result.reports.joinToString("\n", transform = ScriptDiagnostic::render)
+            )
         }
 
         return try {
             responseInfo.result
         } catch (_: UninitializedPropertyAccessException) {
-            buildString {
-                append("HTTP/1.1 ")
-                append(InternalServerError)
-                append("\r\n\r\n")
-                append("This script failed to respond.")
-                append("\r\n\r\n")
-            }
+            serverErrorResponse("The script did not properly respond.")
         }
     }
 

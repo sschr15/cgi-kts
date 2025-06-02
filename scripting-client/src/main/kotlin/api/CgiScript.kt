@@ -55,5 +55,5 @@ public fun CgiScript.stop(): Nothing {
  */
 @PossiblyUnsafeBehavior("Non-standard HTTP responses may not be properly interpreted by a client.")
 public fun CgiScript.respond(text: String) {
-    info.result = text
+    info.result = text.encodeToByteArray()
 }

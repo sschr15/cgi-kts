@@ -32,20 +32,46 @@ int server_fd;
 void signal_handler(int signum) {
     DEBUG("Received signal %d\n", signum);
     if (signum == SIGUSR1) {
-        char general_buffer[1048576];
-        int bytes_read;
+        // char general_buffer[1048576];
+        // int bytes_read;
 
-        do {
-            bytes_read = read(server_fd, general_buffer, 1048576);
-            if (bytes_read == -1) {
-                perror("read");
-                fprintf(stderr, "No bytes read after SIGUSR1\n");
-                printf(RESPONSE_ERROR);
-                close(server_fd);
-                exit(1);
-            }
-            printf("%.*s", bytes_read, general_buffer);
-        } while (bytes_read == 1048576);
+        // do {
+        //     bytes_read = read(server_fd, general_buffer, 1048576);
+        //     if (bytes_read == -1) {
+        //         perror("read");
+        //         fprintf(stderr, "No bytes read after SIGUSR1\n");
+        //         printf(RESPONSE_ERROR);
+        //         close(server_fd);
+        //         exit(1);
+        //     }
+        //     printf("%.*s", bytes_read, general_buffer);
+        // } while (bytes_read == 1048576);
+
+        int length;
+        if (read(server_fd, &length, sizeof(int)) != sizeof(int)) {
+            perror("read length");
+            printf(RESPONSE_ERROR);
+            close(server_fd);
+            exit(1);
+        }
+        if (length < 0) {
+            fprintf(stderr, "Received -1 length after SIGUSR1\n");
+            printf(RESPONSE_ERROR);
+            close(server_fd);
+            exit(1);
+        }
+        char *buffer = malloc(length + 1);
+        if (read(server_fd, buffer, length) != length) {
+            perror("read buffer");
+            printf(RESPONSE_ERROR);
+            free(buffer);
+            close(server_fd);
+            exit(1);
+        }
+        buffer[length] = '\0'; // null-terminate the string
+        DEBUG("Received response: %s\n", buffer);
+        printf("%.*s", length, buffer);
+        free(buffer);
 
         close(server_fd);
 
