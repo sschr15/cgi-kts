@@ -28,6 +28,17 @@ object DaemonMain {
 
         val checker = launch {
             val checkPath = Path(args.getOrNull(1) ?: "./kt-scripts")
+
+            for (path in checkPath.listDirectoryEntries()) {
+                if (path.toString().endsWith(".cgi.kts")) {
+                    logger.info { "Compiling $path (first run)" }
+                    fileMap[path.generateShortName()] = path
+                    launch {
+                        scriptCache.compile(path)
+                    }
+                }
+            }
+
             val compileWatchKey = checkPath.register(
                 FileSystems.getDefault().newWatchService(),
                 StandardWatchEventKinds.ENTRY_CREATE,
@@ -44,7 +55,7 @@ object DaemonMain {
                     if (kind == StandardWatchEventKinds.OVERFLOW) continue
 
                     val path = checkPath.resolve(event.context() as Path)
-                    if (path.extension != "cgi.kts") continue
+                    if (!path.toString().endsWith(".cgi.kts")) continue
 
                     logger.info { "Detected change in $path" }
 
@@ -59,7 +70,7 @@ object DaemonMain {
                     if (kind == StandardWatchEventKinds.OVERFLOW) continue
 
                     val path = checkPath.resolve(event.context() as Path)
-                    if (path.extension != "cgi.kts") continue
+                    if (!path.toString().endsWith(".cgi.kts")) continue
 
                     logger.info { "Detected removal of $path" }
 
